@@ -15,10 +15,11 @@ tracekit demo --agent codex            # the scripted demo, sent as Codex's own 
 ```
 
 For Codex, Cursor, Gemini CLI and Qwen Code the installer merges into existing settings: other hooks and settings are kept, a
-backup is written first, and running it twice changes nothing. For Droid it writes a standalone `.factory/hooks.json`; if
-the legacy `.factory/hooks/hooks.json` exists, init refuses to proceed until you save once in Droid's `/hooks` UI to migrate
-it. For OpenCode it writes its own `tracekit.js` local
-plugin and refuses to overwrite a file it did not install (in `plugin/`, which every OpenCode 1.x loads; 1.0 doesn't
+backup is written first, and running it twice changes nothing. For Droid it writes a standalone `.factory/hooks.json`,
+merges into it when it already exists, and backs up the previous file first. When creating it, the installer copies the
+effective hooks from `settings.json`. If the legacy `.factory/hooks/hooks.json` exists while `.factory/hooks.json` is
+absent, init refuses to proceed until you save once in Droid's `/hooks` UI to migrate it. For OpenCode it writes its own
+`tracekit.js` local plugin and refuses to overwrite a file it did not install (in `plugin/`, which every OpenCode 1.x loads; 1.0 doesn't
 read `plugins/`). For goose it writes its own plugin directory (`plugin.json` plus `hooks/hooks.json`) and refuses
 to install into a plugin whose `plugin.json` is not Tracekit's. A goose rule carries no matcher (goose silently skips
 a rule whose matcher is a bare `*`, which is an invalid regex); the PreToolUse action carries `timeout: 600` and
@@ -52,7 +53,8 @@ A call on several files (a patch's `paths`) is decided on each file: a rule that
 Droid's [hooks reference](https://docs.factory.com/harness/hooks) documents Claude Code's event names and stdin fields.
 Its standalone `hooks.json` is keyed directly by event name, with no `hooks` wrapper (that wrapper is for declarations
 inside `settings.json`). When creating it, the installer copies the effective hooks from `settings.json`. If the legacy
-`.factory/hooks/hooks.json` exists, init refuses to proceed until you save once in Droid's `/hooks` UI to migrate it.
+`.factory/hooks/hooks.json` exists while `.factory/hooks.json` is absent, init refuses to proceed until you save once in
+Droid's `/hooks` UI to migrate it.
 On Windows Droid
 is assumed to run hooks under `cmd.exe`; the interpreter path stays quoted when it contains spaces.
 The documented stdin carries no tool-call id. Tracekit pairs its tool events by tool and arguments, first in first out, in a queue separate
@@ -147,7 +149,7 @@ unrecorded. `tracekit doctor` warns `D-HOOKS-EVENT` for Claude Code, Codex, Curs
 doesn't name its configured event, and `D-HOOKS-TIMEOUT` when a pre-tool timeout is shorter than the 540 s approval
 wait (milliseconds for Gemini CLI and Qwen Code). Re-run init for the active mode to repair the other coding agents' hooks
 (`tracekit init --dev --v2 --agent NAME` in dev, or `sudo tracekit init --v2 --user AGENT --agent NAME` in system
-mode). `tracekit doctor` also checks Droid's hook presence and timeout. OpenCode's JavaScript plugin isn't checked; re-run init after upgrading.
+mode). OpenCode's JavaScript plugin isn't checked; re-run init after upgrading.
 
 ### What the signer records as a gap
 

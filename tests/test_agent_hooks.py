@@ -556,6 +556,22 @@ class Installer(unittest.TestCase):
             agent_hooks.install("droid", d, uninstall=True)
             self.assertFalse(os.path.exists(path))
 
+    def test_droid_uninstall_keeps_empty_file_when_settings_has_hooks(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = agent_hooks.config_path("droid", d)
+            settings_path = os.path.join(os.path.dirname(path), "settings.json")
+            os.makedirs(os.path.dirname(path))
+            with open(path, "w") as f:
+                json.dump({}, f)
+            with open(settings_path, "w") as f:
+                json.dump({"hooks": {"PreToolUse": [{"hooks": [{"command": "echo user"}]}]}}, f)
+
+            agent_hooks.install("droid", d, uninstall=True)
+
+            self.assertTrue(os.path.exists(path))
+            with open(path) as f:
+                self.assertEqual(json.load(f), {})
+
     def test_droid_creation_keeps_settings_hooks_and_uninstall_restores_them(self):
         with tempfile.TemporaryDirectory() as d:
             path = agent_hooks.config_path("droid", d)
@@ -580,6 +596,32 @@ class Installer(unittest.TestCase):
                 self.assertEqual(json.load(f), fallback)
             with open(settings_path) as f:
                 self.assertEqual(json.load(f), settings)
+
+    def test_droid_invalid_fallback_event_names_settings_file(self):
+        from tracekit.install import SettingsError
+        with tempfile.TemporaryDirectory() as d:
+            path = agent_hooks.config_path("droid", d)
+            settings_path = os.path.join(os.path.dirname(path), "settings.json")
+            os.makedirs(os.path.dirname(path))
+            with open(settings_path, "w") as f:
+                json.dump({"hooks": {"PreToolUse": "invalid"}}, f)
+
+            with self.assertRaises(SettingsError) as raised:
+                agent_hooks.install("droid", d, v2=True)
+            self.assertIn(settings_path, str(raised.exception))
+            self.assertFalse(os.path.exists(path))
+
+    def test_droid_invalid_standalone_event_names_hooks_file(self):
+        from tracekit.install import SettingsError
+        with tempfile.TemporaryDirectory() as d:
+            path = agent_hooks.config_path("droid", d)
+            os.makedirs(os.path.dirname(path))
+            with open(path, "w") as f:
+                json.dump({"PreToolUse": "invalid"}, f)
+
+            with self.assertRaises(SettingsError) as raised:
+                agent_hooks.install("droid", d, v2=True)
+            self.assertIn(path, str(raised.exception))
 
     def test_droid_does_not_migrate_inactive_settings_hooks_into_existing_file(self):
         with tempfile.TemporaryDirectory() as d:

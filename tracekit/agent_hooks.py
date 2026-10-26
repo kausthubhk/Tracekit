@@ -707,6 +707,7 @@ def install(harness, project=None, uninstall=False, v2=False, python=None, path=
         return _install_goose(path, uninstall, v2, python)
     if harness == "droid" and uninstall and not os.path.exists(path):
         return path
+    hooks_source = path
     if harness == "droid" and not uninstall and not os.path.exists(path):
         legacy = os.path.join(os.path.dirname(path), "hooks", "hooks.json")
         if os.path.exists(legacy):
@@ -737,6 +738,7 @@ def install(harness, project=None, uninstall=False, v2=False, python=None, path=
                 raise SettingsError(f"{settings}: {e}; Tracekit did not change it.") from e
             # Droid reads settings hooks only while the standalone file is absent; preserve them when creating it.
             s = dict(fallback)
+            hooks_source = settings
     # Droid's standalone hooks.json is the event map; only its settings.json nests that map under `hooks`.
     hooks = s if harness == "droid" else s.setdefault("hooks", {})
     if not isinstance(hooks, dict):
@@ -763,7 +765,7 @@ def install(harness, project=None, uninstall=False, v2=False, python=None, path=
     def entries(ev):
         lst = hooks.get(ev, [])
         if not isinstance(lst, list):
-            raise SettingsError(f"hooks.{ev} in {path} must be a list; Tracekit did not change it.")
+            raise SettingsError(f"hooks.{ev} in {hooks_source} must be a list; Tracekit did not change it.")
         return lst
     if harness == "cursor":
         s.setdefault("version", 1)
@@ -802,7 +804,19 @@ def install(harness, project=None, uninstall=False, v2=False, python=None, path=
     if not hooks and harness != "droid":
         s.pop("hooks", None)
     if uninstall and harness == "droid" and not s:
-        os.unlink(path)
+        settings = os.path.join(os.path.dirname(path), "settings.json")
+        keep_empty = False
+        if os.path.exists(settings):
+            try:
+                with open(settings, encoding="utf-8") as f:
+                    settings_data = json.load(f)
+                keep_empty = not isinstance(settings_data, dict) or bool(settings_data.get("hooks"))
+            except (OSError, ValueError):
+                keep_empty = True   # a malformed settings file may declare hooks; don't activate it by deleting this file
+        if keep_empty:
+            _atomic_write_json(path, s)
+        else:
+            os.unlink(path)
     else:
         _atomic_write_json(path, s)
     if uninstall and harness == "codex":   # init's reasoning summaries line goes with its hooks
